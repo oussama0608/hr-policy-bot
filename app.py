@@ -11,6 +11,9 @@ from pinecone import Pinecone
 # 1. Load Secrets
 load_dotenv()
 
+# PDF to ingest (defaults to handbook.pdf). Override with env var PDF_FILE.
+PDF_FILE = os.path.expanduser(os.getenv("PDF_FILE", "handbook.pdf"))
+
 # 2. Setup Page
 st.set_page_config(page_title="HR Policy Bot", layout="wide")
 st.title("🛡️ AI HR Assistant (with Citations)")
@@ -32,16 +35,16 @@ def setup_vector_store():
     
     # If index is empty, we need to load the PDF
     if stats['total_vector_count'] == 0:
-        st.warning("⚠️ Index is empty. Please verify a 'handbook.pdf' exists in this folder.")
+        st.warning(f"⚠️ Index is empty. Using PDF file: {PDF_FILE}")
         
         # Check if PDF exists
-        if not os.path.exists("handbook.pdf"):
-            st.error("❌ No 'handbook.pdf' found! Please drop a PDF in this folder to start.")
+        if not os.path.exists(PDF_FILE):
+            st.error(f"❌ PDF not found: {PDF_FILE}. Set PDF_FILE env var or place the file here.")
             return None
 
-        with st.spinner("📚 Reading Handbook and training AI... (This happens only once)"):
+        with st.spinner(f"📚 Reading {os.path.basename(PDF_FILE)} and training AI... (This happens only once)"):
             # Load PDF
-            loader = PyPDFLoader("handbook.pdf")
+            loader = PyPDFLoader(PDF_FILE)
             docs = loader.load()
             
             # Split text into chunks 
