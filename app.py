@@ -1,3 +1,16 @@
+"""
+HR Policy Bot - RAG Implementation
+----------------------------------
+This application uses LangChain and Pinecone to provide a Retrieval-Augmented Generation (RAG)
+interface for HR documents.
+
+Architecture:
+1. Ingestion: PDF loading -> Recursive Character Split -> OpenAI Embeddings -> Pinecone Upsert
+2. Retrieval: User Query -> Vector Search (Top K) -> Context retrieval
+3. Generation: Context + Query -> GPT-4o-mini -> Answer with sources
+
+Author/Portfolio: [Your Name]
+"""
 import os
 import time
 from pathlib import Path
@@ -11,6 +24,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pinecone import Pinecone
 
 # 1. Load Secrets
+# Load environment variables from .env file for local development
 load_dotenv()
 
 # 2. Setup Page
@@ -20,6 +34,7 @@ st.title("🛡️ AI HR Assistant (with Citations)")
 # Defaults (can be overridden via UI)
 DEFAULT_PDF = os.path.expanduser(os.getenv("PDF_FILE", "handbook.pdf"))
 DEFAULT_INDEX = os.getenv("PINECONE_INDEX_NAME", "")
+
 
 # --- Sidebar: configuration ---
 st.sidebar.header("Configuration")

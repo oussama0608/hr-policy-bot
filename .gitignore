@@ -36,3 +36,7 @@ htmlcov/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Upwork Portfolio Assets
+demo_script.md
+portfolio_entry.md
