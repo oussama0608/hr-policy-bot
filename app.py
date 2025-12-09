@@ -32,7 +32,7 @@ st.set_page_config(page_title="HR Policy Bot", layout="wide")
 st.title("🛡️ AI HR Assistant (with Citations)")
 
 # Defaults (can be overridden via UI)
-DEFAULT_PDF = os.path.expanduser(os.getenv("PDF_FILE", "handbook.pdf"))
+DEFAULT_PDF = os.path.expanduser(os.getenv("PDF_FILE", "jp-morgan-chase-code-of-conduct-policy.pdf"))
 DEFAULT_INDEX = os.getenv("PINECONE_INDEX_NAME", "")
 
 
@@ -85,10 +85,10 @@ top_k = st.sidebar.slider("Top K (retrieval)", min_value=1, max_value=10, value=
 
 default_samples = "\n".join(
     [
-        "What is the vacation policy?",
-        "What is the dress code?",
-        "How do I report a workplace safety issue?",
-        "What is the parental leave policy?",
+        "What is the policy on gifts and business hospitality?",
+        "Can I engage in political activity?",
+        "What are the rules regarding personal finances?",
+        "How do I report a violation?",
     ]
 )
 sample_questions_raw = st.sidebar.text_area(
@@ -119,26 +119,49 @@ def require_keys():
 
 
 # 3. Initialize Logic (Cached so it doesn't re-run every click)
+
+# 3. Initialize Logic (Cached so it doesn't re-run every click)
+def get_clean_namespace(filename):
+    """Derive a clean namespace from the filename."""
+    stem = Path(filename).stem
+    # Replace non-alphanumeric chars with _
+    clean = "".join(c if c.isalnum() else "_" for c in stem)
+    return clean
+
 @st.cache_resource(show_spinner=False)
 def setup_vector_store(pdf_file, chunk_sz, chunk_ov, index, recreate_marker):
     pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
     index_client = pc.Index(index)
-    stats = index_client.describe_index_stats()
+    namespace = get_clean_namespace(pdf_file)
+    
+    try:
+        stats = index_client.describe_index_stats()
+        ns_stats = stats.get("namespaces", {}).get(namespace, {})
+        vector_count = ns_stats.get("vector_count", 0)
+    except Exception as e:
+        st.error(f"Error fetching index stats: {e}")
+        return None
 
-    should_recreate = recreate_marker or stats.get("total_vector_count", 0) == 0
+    should_recreate = recreate_marker or vector_count == 0
+    
     if should_recreate:
         if not Path(pdf_file).exists():
             st.error(f"❌ PDF not found: {pdf_file}. Upload or point to a valid file.")
             return None
 
-        try:
-            index_client.delete(delete_all=True)
-        except Exception:
-            st.warning("Could not clear existing vectors; proceeding to upsert new chunks.")
+        # Try to clear only this namespace
+        if vector_count > 0:
+            try:
+                index_client.delete(delete_all=True, namespace=namespace)
+                st.info(f"Cleared existing vectors in namespace '{namespace}'.")
+            except Exception as e:
+                # If delete fails, we might still be okay if we are upserting, 
+                # but mixed data is a risk. Logging the error is important.
+                st.warning(f"Could not clear namespace '{namespace}': {e}. Proceeding to upsert.")
 
-        with st.spinner(f"📚 Reading {Path(pdf_file).name} and refreshing knowledge base..."):
+        with st.spinner(f"📚 Reading {Path(pdf_file).name} into namespace '{namespace}'..."):
             loader = PyPDFLoader(pdf_file)
             docs = loader.load()
             splitter = RecursiveCharacterTextSplitter(
@@ -151,11 +174,16 @@ def setup_vector_store(pdf_file, chunk_sz, chunk_ov, index, recreate_marker):
                 documents=splits,
                 embedding=embeddings,
                 index_name=index,
+                namespace=namespace
             )
-            st.success("✅ Knowledge base updated.")
+            st.success(f"✅ Knowledge base updated (Namespace: {namespace}).")
             return docsearch
 
-    return PineconeVectorStore.from_existing_index(index_name=index, embedding=embeddings)
+    return PineconeVectorStore.from_existing_index(
+        index_name=index, 
+        embedding=embeddings,
+        namespace=namespace
+    )
 
 
 vector_store = setup_vector_store(pdf_path, chunk_size, chunk_overlap, index_name, recreate_token) if require_keys() else None
