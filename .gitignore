@@ -40,3 +40,6 @@ htmlcov/
 # Upwork Portfolio Assets
 demo_script.md
 portfolio_entry.md
+voiceover.mp3
+VOICEOVER_README.md
+generate_voiceover.py
